@@ -46,7 +46,19 @@ async def test_package_page(client: httpx.AsyncClient, fake_pypi: FakePyPI) -> N
     assert "SBOM for maturin" in resp.text
     assert "CycloneDX" in resp.text
     assert 'rel="nofollow"' in resp.text
+    assert f"pypi-tea {pages._VERSION}" in resp.text
     assert "s-maxage" in resp.headers["cache-control"]
+
+
+async def test_dashboard_and_static_assets(client: httpx.AsyncClient) -> None:
+    resp = await client.get("/")
+    assert resp.status_code == 200
+    assert 'id="dashboard"' in resp.text
+    assert "cdn.tailwindcss.com" not in resp.text
+    for path in ("/static/css/site.css", "/static/fonts/figtree-latin.woff2", "/static/img/logo.svg"):
+        asset = await client.get(path)
+        assert asset.status_code == 200, path
+        assert "s-maxage" in asset.headers["cache-control"]
 
 
 async def test_package_page_without_sbom_is_404(client: httpx.AsyncClient, fake_pypi: FakePyPI) -> None:

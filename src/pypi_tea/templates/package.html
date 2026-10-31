@@ -61,134 +61,131 @@
 {% endblock %}
 
 {% block content %}
-  <article>
-    <!-- Breadcrumb -->
-    <nav class="text-sm text-gray-500 mb-6" aria-label="Breadcrumb">
-      <a href="/packages" class="hover:text-gray-300">Packages</a>
-      <span class="mx-1">/</span>
-      <span class="text-gray-300">{{ name }} {{ version }}</span>
-    </nav>
-
-    <header class="mb-8">
-      <h1 class="text-3xl font-bold">SBOM for {{ name }} <span class="text-gray-400">{{ version }}</span></h1>
+  {% set check_icon %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>{% endset %}
+  {% set cross_icon %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 18L18 6M6 6l12 12"/></svg>{% endset %}
+  <article class="wrap">
+    <header class="page-head">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/packages">Packages</a>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page">{{ name }} {{ version }}</span>
+      </nav>
+      <h1>SBOM for {{ name }} <span class="version">{{ version }}</span></h1>
       {% if summary %}
-      <p class="text-gray-400 mt-2 text-lg">{{ summary }}</p>
+      <p class="lede">{{ summary }}</p>
       {% endif %}
-      <div class="flex flex-wrap gap-2 mt-4">
-        {% for fmt in formats %}
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {% if 'CycloneDX' in fmt %}bg-cyan-900/50 text-cyan-300 border border-cyan-800{% elif 'SPDX' in fmt %}bg-purple-900/50 text-purple-300 border border-purple-800{% else %}bg-gray-800 text-gray-300 border border-gray-700{% endif %}">{{ fmt }}</span>
-        {% endfor %}
+      <div class="tags">
+        {% for fmt in formats %}<span class="tag">{{ fmt }}</span>{% endfor %}
         {% if has_attestation %}
-        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-900/50 text-green-300 border border-green-800">
-          <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          PEP 740 Attested
+        <span class="tag tag-success">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          PEP 740 attested
         </span>
         {% endif %}
       </div>
     </header>
 
-    <!-- Package metadata -->
-    <section class="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-8">
-      <h2 class="text-lg font-semibold mb-4">Package Information</h2>
-      <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+    <section class="section card card-body" aria-labelledby="info-heading">
+      <h2 id="info-heading" class="visually-hidden">Package information</h2>
+      <dl class="meta-grid">
         {% if author %}
         <div>
-          <dt class="text-gray-500">Author</dt>
+          <dt>Author</dt>
           <dd>{{ author }}</dd>
         </div>
         {% endif %}
         {% if license %}
         <div>
-          <dt class="text-gray-500">License</dt>
+          <dt>License</dt>
           <dd>{{ license }}</dd>
         </div>
         {% endif %}
         {% if requires_python %}
         <div>
-          <dt class="text-gray-500">Requires Python</dt>
+          <dt>Requires Python</dt>
           <dd>{{ requires_python }}</dd>
         </div>
         {% endif %}
         <div>
-          <dt class="text-gray-500">PyPI</dt>
-          <dd><a href="https://pypi.org/project/{{ name }}/{{ version }}/" class="text-cyan-400 hover:text-cyan-300" rel="noopener">{{ name }} {{ version }}</a></dd>
+          <dt>PyPI</dt>
+          <dd><a href="https://pypi.org/project/{{ name }}/{{ version }}/" class="link" rel="noopener">{{ name }} {{ version }}</a></dd>
         </div>
         {% for label, url in project_urls.items() %}
         <div>
-          <dt class="text-gray-500">{{ label }}</dt>
-          <dd><a href="{{ url }}" class="text-cyan-400 hover:text-cyan-300 break-all" rel="noopener nofollow">{{ url }}</a></dd>
+          <dt>{{ label }}</dt>
+          <dd><a href="{{ url }}" class="link break" rel="noopener nofollow">{{ url }}</a></dd>
         </div>
         {% endfor %}
       </dl>
     </section>
 
-    <!-- SBOM downloads -->
-    <section class="mb-8">
-      <h2 class="text-lg font-semibold mb-4">Available SBOMs</h2>
+    <section class="section" aria-labelledby="sboms-heading">
+      <div class="section-head">
+        <h2 id="sboms-heading">Available SBOMs</h2>
+        <p>Read from <code>.dist-info/sboms/</code> in each wheel.</p>
+      </div>
       {% for wheel in wheels %}
-      <div class="bg-gray-900 rounded-xl border border-gray-800 mb-4 overflow-hidden">
-        <div class="px-6 py-3 bg-gray-800/50 border-b border-gray-800">
-          <div class="flex items-center justify-between gap-3">
-            <h3 class="text-sm font-mono text-gray-300 break-all">{{ wheel.filename }}</h3>
+      <div class="card wheel">
+        <div class="card-head">
+          <div class="wheel-title">
+            <h3>{{ wheel.filename }}</h3>
             {% if wheel.attestation and wheel.attestation.status == "verified" %}
-            <span class="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-900/50 text-green-300 border border-green-800" title="Verified by {{ wheel.attestation.publisher_kind }}{% if wheel.attestation.repository %} ({{ wheel.attestation.repository }}){% endif %}">
-              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-              Attested
-            </span>
+            <span class="tag tag-success" title="Verified by {{ wheel.attestation.publisher_kind }}{% if wheel.attestation.repository %} ({{ wheel.attestation.repository }}){% endif %}">{{ check_icon }} Attested</span>
             {% elif wheel.attestation and wheel.attestation.status == "failed" %}
-            <span class="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-900/50 text-red-300 border border-red-800" title="{{ wheel.attestation.error or 'Verification failed' }}">
-              <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-              Failed
-            </span>
+            <span class="tag tag-danger" title="{{ wheel.attestation.error or 'Verification failed' }}">{{ cross_icon }} Failed</span>
             {% endif %}
           </div>
           {% if wheel.attestation and wheel.attestation.status == "verified" %}
-          <div class="mt-2 text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
-            {% if wheel.attestation.publisher_kind %}<span>Publisher: <span class="text-gray-400">{{ wheel.attestation.publisher_kind }}</span></span>{% endif %}
-            {% if wheel.attestation.repository %}<span>Source: <span class="text-gray-400">{{ wheel.attestation.repository }}</span></span>{% endif %}
-            {% if wheel.attestation.workflow %}<span>Workflow: <span class="text-gray-400">{{ wheel.attestation.workflow }}</span></span>{% endif %}
-            {% if wheel.attestation.environment %}<span>Environment: <span class="text-gray-400">{{ wheel.attestation.environment }}</span></span>{% endif %}
+          <div class="wheel-meta">
+            {% if wheel.attestation.publisher_kind %}<span>Publisher: <b>{{ wheel.attestation.publisher_kind }}</b></span>{% endif %}
+            {% if wheel.attestation.repository %}<span>Source: <b>{{ wheel.attestation.repository }}</b></span>{% endif %}
+            {% if wheel.attestation.workflow %}<span>Workflow: <b>{{ wheel.attestation.workflow }}</b></span>{% endif %}
+            {% if wheel.attestation.environment %}<span>Environment: <b>{{ wheel.attestation.environment }}</b></span>{% endif %}
           </div>
           {% endif %}
         </div>
-        <div class="divide-y divide-gray-800">
-          {% for sbom in wheel.sboms %}
-          <div class="px-6 py-4 flex items-center justify-between gap-4">
-            <div class="flex items-center gap-3 min-w-0">
-              {% if sbom.valid is not none %}
-              <span class="flex-shrink-0 {% if sbom.valid %}text-green-400{% else %}text-red-400{% endif %}" title="{% if sbom.valid %}Valid{% else %}Invalid{% endif %}">
-                {% if sbom.valid %}
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                {% else %}
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                {% endif %}
-              </span>
-              {% endif %}
-              <div class="min-w-0">
-                <div class="text-sm font-mono text-gray-300 truncate">{{ sbom.path.split('/')[-1] }}</div>
-                <div class="text-xs text-gray-500 flex flex-wrap gap-2 mt-1">
-                  {% if sbom.format %}<span>{{ sbom.format }}</span>{% endif %}
-                  <span>{{ sbom.media_type }}</span>
-                </div>
+        {% for sbom in wheel.sboms %}
+        <div class="sbom-row">
+          <div class="sbom-file">
+            {% if sbom.valid is not none %}
+            <span class="icon {% if sbom.valid %}ok{% else %}bad{% endif %}" title="{% if sbom.valid %}Valid{% else %}Invalid{% endif %}">
+              {% if sbom.valid %}{{ check_icon }}{% else %}{{ cross_icon }}{% endif %}
+              <span class="visually-hidden">{% if sbom.valid %}Valid{% else %}Invalid{% endif %}</span>
+            </span>
+            {% endif %}
+            <div class="sbom-file-text">
+              <div class="name">{{ sbom.path.split('/')[-1] }}</div>
+              <div class="kind">
+                {% if sbom.format %}<span>{{ sbom.format }}</span>{% endif %}
+                <span>{{ sbom.media_type }}</span>
               </div>
             </div>
-            <a href="{{ sbom.download_url }}" rel="nofollow" class="flex-shrink-0 inline-flex items-center px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-medium transition-colors" download>
-              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-              Download
-            </a>
           </div>
-          {% endfor %}
+          <a href="{{ sbom.download_url }}" rel="nofollow" class="btn btn-navy" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Download
+          </a>
         </div>
+        {% endfor %}
       </div>
       {% endfor %}
     </section>
 
-    <!-- TEA usage -->
-    <section class="bg-gray-900 rounded-xl p-6 border border-gray-800">
-      <h2 class="text-lg font-semibold mb-4">Access via TEA</h2>
-      <p class="text-sm text-gray-400 mb-3">Use the <a href="https://github.com/CycloneDX/transparency-exchange-api" class="text-cyan-400 hover:text-cyan-300">Transparency Exchange API</a> to fetch this SBOM programmatically:</p>
-      <pre class="bg-gray-800 rounded-lg p-4 text-sm overflow-x-auto"><code class="text-cyan-300">pip install libtea
+    <section class="section card card-body" aria-labelledby="tea-heading">
+      <h2 id="tea-heading">Access via TEA</h2>
+      <p class="prose-sm">Use the <a href="https://github.com/CycloneDX/transparency-exchange-api" class="link" rel="noopener">Transparency Exchange API</a> to fetch this SBOM programmatically:</p>
+      <div class="code">
+        <pre><code>pip install libtea
 python -m libtea {{ server_root_url }} pkg:pypi/{{ name }}@{{ version }}</code></pre>
+      </div>
     </section>
+
+    <aside class="cta">
+      <div>
+        <h2>Manage SBOMs for your own releases</h2>
+        <p>sbomify collects, shares and monitors SBOMs across every product you ship.</p>
+      </div>
+      <a class="btn btn-secondary" href="https://sbomify.com/">Learn more</a>
+    </aside>
   </article>
 {% endblock %}

@@ -77,3 +77,4 @@ PyPI Package → TEA Product, Version → ProductRelease, Wheel file → Compone
 - `B008` ignored in ruff (FastAPI `Depends()` pattern)
 - gunicorn and uvicorn-worker have no type information — see the mypy overrides in `pyproject.toml`
 - Configuration via environment variables with `PYPI_TEA_` prefix
+- HTML follows the sbomify design tokens (shared with sbomify.com): `templates/` extend `base.html`, styles live in the hand-written `static/css/site.css` (no build step, no Tailwind). Navy carries content, Signal Orange is the page's one call to action, status uses the semantic palette

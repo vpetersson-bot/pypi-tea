@@ -1,0 +1,599 @@
+{% extends "base.html" %}
+
+{% block title %}pypi-tea — SBOM Coverage Dashboard for PyPI Packages{% endblock %}
+
+{% block meta %}
+  <meta name="description" content="Live dashboard tracking SBOM (Software Bill of Materials) adoption across PyPI packages. See which Python packages ship CycloneDX or SPDX SBOMs in their wheels.">
+  <meta name="keywords" content="SBOM, PyPI, CycloneDX, SPDX, Software Bill of Materials, Python, supply chain security, TEA, Transparency Exchange API">
+  <link rel="canonical" href="https://pypi.sbomify.com/">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="pypi-tea — SBOM Coverage for PyPI Packages">
+  <meta property="og:description" content="Live dashboard tracking SBOM adoption across the top PyPI packages. Powered by the Transparency Exchange API.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pypi.sbomify.com/">
+  <meta property="og:site_name" content="pypi-tea">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="pypi-tea — SBOM Coverage for PyPI Packages">
+  <meta name="twitter:description" content="Live dashboard tracking SBOM adoption across the top PyPI packages. Powered by the Transparency Exchange API.">
+
+{% endblock %}
+
+{% block head %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "pypi-tea",
+    "description": "SBOM coverage dashboard for PyPI packages, powered by the Transparency Exchange API (TEA)",
+    "url": "https://pypi.sbomify.com/",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Any",
+    "author": {
+      "@type": "Organization",
+      "name": "sbomify",
+      "url": "https://sbomify.com"
+    },
+    "codeRepository": "https://github.com/sbomify/pypi-tea",
+    "license": "https://opensource.org/licenses/Apache-2.0",
+    "softwareRequirements": {
+      "@type": "SoftwareApplication",
+      "name": "libtea",
+      "description": "Python client library for the Transparency Exchange API (TEA)",
+      "url": "https://pypi.org/project/libtea/",
+      "codeRepository": "https://github.com/sbomify/py-libtea",
+      "applicationCategory": "DeveloperApplication"
+    }
+  }
+  </script>
+{% endblock %}
+
+{% macro chart_card(id, title, caption=None, empty=None, summary=None) %}
+        <div class="card card-body">
+          <h2>{{ title }}</h2>
+          {% if caption %}<p class="caption">{{ caption }}</p>{% endif %}
+          {% if empty %}<div id="{{ id }}-empty" class="empty hidden">{{ empty }}</div>{% endif %}
+          <div id="{{ id }}-wrap" class="chart"><canvas id="{{ id }}-chart" role="img" aria-label="{{ title }}"></canvas></div>
+          {% if summary %}<p id="{{ id }}-summary" class="chart-note hidden"></p>{% endif %}
+        </div>
+{% endmacro %}
+
+{% macro stat(id, label, note=None) %}
+        <div class="stat">
+          <div class="eyebrow">{{ label }}</div>
+          <div id="{{ id }}" class="value">–</div>
+          {% if note %}<div class="note">{{ note }}</div>{% endif %}
+        </div>
+{% endmacro %}
+
+{% block content %}
+  <section class="hero">
+    <div class="wrap">
+      <span class="eyebrow-chip">Transparency Exchange API</span>
+      <h1>SBOM coverage across PyPI</h1>
+      <p class="lede">Which Python packages ship a CycloneDX or SPDX SBOM inside their wheels, whether it validates, and whether the wheel carries a PEP 740 attestation. Every SBOM found is served over TEA.</p>
+      <div class="hero-actions">
+        <a class="btn btn-navy" href="/packages">Browse packages</a>
+        <a class="btn btn-secondary" href="#tea">Query with TEA</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <p id="loading" class="muted">Loading stats…</p>
+    <p id="error" class="alert hidden" role="alert"></p>
+
+    <div id="dashboard" class="hidden">
+      <section class="section" aria-label="Summary">
+        <div class="stats">
+{{ stat("packages-explored", "Packages explored", "Unique package versions checked") }}
+{{ stat("packages-with-sbom", "Packages with SBOMs", "At least one wheel contains an SBOM") }}
+{{ stat("sbom-coverage", "SBOM coverage", "Share of packages with SBOMs") }}
+{{ stat("wheels-with-sbom", "Wheels with SBOMs", "Individual .whl files containing SBOMs") }}
+{{ stat("wheels-attested", "Wheels attested", "PEP 740 verified wheels") }}
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="sboms-heading">
+        <div class="section-head">
+          <h2 id="sboms-heading">SBOMs</h2>
+          <p>What ships, and whether it holds up.</p>
+        </div>
+        <div class="grid grid-2">
+{{ chart_card("coverage", "Package SBOM coverage") }}
+{{ chart_card("formats", "SBOM formats", "Detected by parsing file content, not file extensions", "No format data yet") }}
+{{ chart_card("validation", "SBOM validation", "Schema validation against the CycloneDX and SPDX specs", "No validation data yet", True) }}
+{{ chart_card("encoding", "SBOM encoding", "File format breakdown: JSON, XML, tag-value", "No encoding data yet") }}
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="attestation-heading">
+        <div class="section-head">
+          <h2 id="attestation-heading">Attestations</h2>
+          <p>Sigstore-based provenance, verified per wheel.</p>
+        </div>
+        <div class="grid grid-2">
+{{ chart_card("attestation", "PEP 740 attestation status", "Verification result per wheel", "No attestation data yet", True) }}
+{{ chart_card("publishers", "Attestation publishers", "CI/CD platform that signed the attestation", "No publisher data yet") }}
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="growth-heading">
+        <div class="section-head">
+          <h2 id="growth-heading">Over time</h2>
+        </div>
+        <div class="stack">
+          <div class="card card-body">
+            <h2>Packages explored per day</h2>
+            <div class="chart chart-wide"><canvas id="packages-time-chart" role="img" aria-label="Packages explored per day"></canvas></div>
+          </div>
+          <div class="card card-body">
+            <h2>Cumulative SBOM discovery</h2>
+            <div class="chart chart-wide"><canvas id="sbom-time-chart" role="img" aria-label="Cumulative SBOM discovery"></canvas></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="wheels-heading">
+        <div class="card card-body">
+          <h2 id="wheels-heading">Wheel-level breakdown</h2>
+          <p class="caption">Each package version ships several wheels, one per platform and Python version. This is SBOM coverage per individual wheel.</p>
+          <div class="grid grid-3 mt">
+            <div><div class="eyebrow">Total wheels</div><div id="wheels-total" class="stat-inline">–</div></div>
+            <div><div class="eyebrow">With SBOM</div><div id="wheels-with" class="stat-inline ok">–</div></div>
+            <div><div class="eyebrow">Without SBOM</div><div id="wheels-without" class="stat-inline subtle">–</div></div>
+          </div>
+          <div class="meter mt"><span id="wheels-bar" style="width:0%"></span></div>
+          <p class="chart-note text-right"><span id="wheels-pct">–</span> of wheels include an SBOM</p>
+        </div>
+      </section>
+
+      <section id="usage-section" class="section hidden" aria-labelledby="usage-heading">
+        <div class="section-head">
+          <h2 id="usage-heading">Usage</h2>
+          <p>Queries this server has answered.</p>
+        </div>
+        <div class="stack">
+          <div class="stats">
+{{ stat("usage-total-queries", "Total queries") }}
+{{ stat("usage-qualifier-queries", "With platform filters", "Queries using os/arch qualifiers") }}
+{{ stat("usage-unique-packages", "Unique packages queried") }}
+          </div>
+          <div class="card card-body">
+            <h2>Queries per day</h2>
+            <div id="usage-daily-empty" class="empty hidden">No queries yet</div>
+            <div id="usage-daily-wrap" class="chart chart-wide"><canvas id="usage-daily-chart" role="img" aria-label="Queries per day"></canvas></div>
+          </div>
+          <div class="grid grid-2">
+            <div class="card card-body"><h2>Top packages queried</h2><ul id="usage-top-packages" class="bars"></ul></div>
+            <div class="card card-body"><h2>Endpoint hits</h2><ul id="usage-endpoints" class="bars"></ul></div>
+            <div class="card card-body"><h2>OS qualifiers used</h2><ul id="usage-os-qualifiers" class="bars"></ul></div>
+            <div class="card card-body"><h2>Arch qualifiers used</h2><ul id="usage-arch-qualifiers" class="bars"></ul></div>
+          </div>
+          <div class="card card-body">
+            <h2>Recent queries</h2>
+            <div class="table-wrap mt-sm">
+              <table class="table-compact">
+                <thead>
+                  <tr><th scope="col">Package</th><th scope="col">Version</th><th scope="col">Platform</th><th scope="col">SBOM</th><th scope="col" class="num">Time</th></tr>
+                </thead>
+                <tbody id="usage-recent-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tea" class="section card card-body" aria-labelledby="tea-heading">
+        <h2 id="tea-heading">How to use TEA</h2>
+        <div class="prose-sm">
+          <p>The <a href="https://github.com/CycloneDX/transparency-exchange-api" class="link" rel="noopener">Transparency Exchange API (TEA)</a> is an open standard for discovering SBOMs. Query this server with <a href="https://pypi.org/project/libtea/" class="link" rel="noopener">tea-cli</a>:</p>
+        </div>
+        <div class="code">
+          <button type="button" class="copy" data-copy="tea-example">Copy</button>
+          <pre><code id="tea-example"><span class="c"># Install the TEA CLI</span>
+$ pip install libtea[cli]
+
+<span class="c"># Inspect a PyPI package — discovers SBOMs via TEA in one shot</span>
+$ tea-cli inspect <span class="s">"urn:tei:purl:pypi.sbomify.com:pkg:pypi/cryptography@44.0.2"</span>
+
+<span class="c"># Search for a specific package version by PURL</span>
+$ tea-cli search-releases --id-type PURL \
+    --id-value <span class="s">"pkg:pypi/cryptography@44.0.2"</span> --domain pypi.sbomify.com
+
+<span class="c"># Filter by platform — only get SBOMs for Linux x86_64 wheels</span>
+$ tea-cli search-releases --id-type PURL \
+    --id-value <span class="s">"pkg:pypi/numpy@1.26.0?os=linux&amp;arch=x86_64"</span> --domain pypi.sbomify.com</code></pre>
+        </div>
+        <div class="prose-sm mt">
+          <p>Also available as a <a href="https://pypi.org/project/libtea/" class="link" rel="noopener">Python library</a>: <code>from libtea import TeaClient</code></p>
+          <p><strong>Platform filtering:</strong> add <code>?os=linux&amp;arch=x86_64</code> qualifiers to a PURL to get SBOMs only for matching wheels.
+            Supported OS values: <code>linux</code>, <code>darwin</code>/<code>macos</code>, <code>windows</code>.
+            Supported arch values: <code>x86_64</code>/<code>amd64</code>, <code>aarch64</code>/<code>arm64</code>, <code>i686</code>, <code>ppc64le</code>, <code>s390x</code>.
+            Pure-Python wheels are always included.</p>
+        </div>
+      </section>
+
+      <aside class="cta">
+        <div>
+          <h2>Ship SBOMs for your own releases</h2>
+          <p>sbomify collects, shares and monitors SBOMs across every product you ship.</p>
+        </div>
+        <a class="btn btn-secondary" href="https://sbomify.com/">Learn more</a>
+      </aside>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+  <script>
+    // Chart colours from the sbomify tokens (static/css/site.css). Navy carries
+    // the data; the semantic palette marks status; orange stays out of charts.
+    const C = {
+      navy: '#25293F',
+      navy80: '#51546B',
+      navy60: '#7C7F8C',
+      navy40: '#A8A9B2',
+      navy20: '#D3D4D9',
+      navy10: '#E9EAEC',
+      success: '#1FA971',
+      successTint: 'rgba(31, 169, 113, 0.12)',
+      navyTint: 'rgba(37, 41, 63, 0.08)',
+      danger: '#E5484D',
+      warning: '#F4A425',
+      info: '#4263EB',
+      info60: '#7B92F0',
+      info30: '#B3C1F7',
+    };
+
+    // One family per hue: CycloneDX in navy, SPDX in info blue.
+    const CDX_PALETTE = [C.navy, C.navy80, C.navy60, C.navy40];
+    const SPDX_PALETTE = [C.info, C.info60, C.info30];
+    const OTHER_PALETTE = [C.warning, C.navy20];
+
+    function getFormatColor(name, indexInFamily) {
+      if (name.startsWith('CycloneDX')) return CDX_PALETTE[indexInFamily % CDX_PALETTE.length];
+      if (name.startsWith('SPDX')) return SPDX_PALETTE[indexInFamily % SPDX_PALETTE.length];
+      return OTHER_PALETTE[indexInFamily % OTHER_PALETTE.length];
+    }
+
+    const ENCODING_LABELS = {
+      'application/vnd.cyclonedx+json': 'CycloneDX JSON',
+      'application/vnd.cyclonedx+xml': 'CycloneDX XML',
+      'application/spdx+json': 'SPDX JSON',
+      'application/spdx+rdf': 'SPDX RDF/XML',
+      'text/spdx': 'SPDX Tag-Value',
+      'application/octet-stream': 'Unknown',
+    };
+    const ENCODING_COLORS = {
+      'CycloneDX JSON': C.navy,
+      'CycloneDX XML': C.navy60,
+      'SPDX JSON': C.info,
+      'SPDX RDF/XML': C.info60,
+      'SPDX Tag-Value': C.info30,
+      'Unknown': C.navy20,
+    };
+    const ATTESTATION_COLORS = {
+      'Verified': C.success,
+      'Not Available': C.navy20,
+      'Failed': C.danger,
+      'Disabled': C.warning,
+    };
+    const PUBLISHER_COLORS = {
+      'GitHub': C.navy,
+      'GitLab': C.navy60,
+      'Google': C.info,
+      'CircleCI': C.navy40,
+    };
+
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.font.size = 12;
+    Chart.defaults.color = C.navy80;
+    Chart.defaults.borderColor = C.navy10;
+    Chart.defaults.maintainAspectRatio = false;
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+    Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
+    Chart.defaults.plugins.legend.labels.boxWidth = 8;
+    Chart.defaults.plugins.legend.labels.boxHeight = 8;
+    Chart.defaults.plugins.tooltip.backgroundColor = C.navy;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.boxPadding = 4;
+
+    const GRID = { color: C.navy10 };
+    const TIME_SCALE = {
+      type: 'time',
+      time: { tooltipFormat: 'MMM d', unit: 'day', displayFormats: { day: 'MMM d' } },
+      grid: { display: false },
+    };
+    const Y_SCALE = { beginAtZero: true, grid: GRID, border: { display: false } };
+
+    const charts = {};
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => n.toLocaleString();
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+    function draw(key, canvasId, config) {
+      if (charts[key]) charts[key].destroy();
+      charts[key] = new Chart($(canvasId).getContext('2d'), config);
+    }
+
+    // Show the chart or its empty state.
+    function toggle(id, hasData) {
+      $(id + '-wrap').classList.toggle('hidden', !hasData);
+      const empty = $(id + '-empty');
+      if (empty) empty.classList.toggle('hidden', hasData);
+      const summary = $(id + '-summary');
+      if (summary) summary.classList.toggle('hidden', !hasData);
+    }
+
+    function pctTooltip(total) {
+      return {
+        callbacks: {
+          label: (ctx) => {
+            const pct = total > 0 ? (ctx.raw / total * 100).toFixed(1) : 0;
+            return ` ${ctx.label}: ${fmt(ctx.raw)} (${pct}%)`;
+          },
+        },
+      };
+    }
+
+    function doughnut(key, labels, data, colors, total) {
+      draw(key, key + '-chart', {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#fff', borderWidth: 2, hoverOffset: 4 }] },
+        options: {
+          cutout: '68%',
+          plugins: {
+            legend: { position: 'bottom' },
+            tooltip: total === undefined ? {} : pctTooltip(total),
+          },
+        },
+      });
+    }
+
+    function renderSummary(data) {
+      const p = data.packages;
+      const w = data.wheels;
+
+      $('packages-explored').textContent = fmt(p.total_explored);
+      $('packages-with-sbom').textContent = fmt(p.with_sbom);
+      $('sbom-coverage').textContent = p.sbom_percentage !== null ? p.sbom_percentage + '%' : '–';
+      $('wheels-with-sbom').textContent = fmt(w.with_sbom);
+
+      $('wheels-total').textContent = fmt(w.total_checked);
+      $('wheels-with').textContent = fmt(w.with_sbom);
+      $('wheels-without').textContent = fmt(w.without_sbom);
+      const wheelShare = w.total_checked > 0 ? w.with_sbom / w.total_checked * 100 : 0;
+      $('wheels-pct').textContent = w.total_checked > 0 ? wheelShare.toFixed(1) + '%' : '–';
+      $('wheels-bar').style.width = wheelShare + '%';
+
+      const hasData = p.total_explored > 0;
+      doughnut('coverage', ['With SBOM', 'Without SBOM'],
+        hasData ? [p.with_sbom, p.without_sbom] : [0, 1],
+        hasData ? [C.success, C.navy20] : [C.navy10, C.navy10],
+        p.total_explored);
+
+      renderFormatsChart(data.sbom_formats || {});
+      renderValidationChart(data.sbom_validation || {});
+      renderEncodingChart(data.sbom_encodings || {});
+
+      const att = data.attestations || {};
+      $('wheels-attested').textContent = fmt(att.verified || 0);
+      renderAttestationChart(att);
+      renderPublishersChart(data.attestation_publishers || {});
+    }
+
+    function renderFormatsChart(formats) {
+      const entries = Object.entries(formats).sort((a, b) => b[1] - a[1]);
+      toggle('formats', entries.length > 0);
+      if (!entries.length) return;
+      const familyCounts = {};
+      const colors = entries.map(([name]) => {
+        const family = name.split('/')[0];
+        familyCounts[family] = familyCounts[family] || 0;
+        return getFormatColor(name, familyCounts[family]++);
+      });
+      doughnut('formats', entries.map(([name]) => name), entries.map(([, n]) => n), colors);
+    }
+
+    function renderValidationChart(validation) {
+      const valid = validation.valid || 0;
+      const invalid = validation.invalid || 0;
+      const total = valid + invalid;
+      toggle('validation', total > 0);
+      if (!total) return;
+      doughnut('validation', ['Valid', 'Invalid'], [valid, invalid], [C.success, C.danger], total);
+      const validPct = (valid / total * 100).toFixed(1);
+      $('validation-summary').innerHTML = invalid > 0
+        ? `<strong class="ok">${fmt(valid)}</strong> valid, <strong class="bad">${fmt(invalid)}</strong> invalid (${validPct}% pass rate)`
+        : `<strong class="ok">${fmt(valid)}</strong> SBOMs, all valid`;
+    }
+
+    function renderEncodingChart(encodings) {
+      const entries = Object.entries(encodings).sort((a, b) => b[1] - a[1]);
+      toggle('encoding', entries.length > 0);
+      if (!entries.length) return;
+      const labels = entries.map(([mt]) => ENCODING_LABELS[mt] || mt);
+      doughnut('encoding', labels, entries.map(([, n]) => n), labels.map((l) => ENCODING_COLORS[l] || C.navy20));
+    }
+
+    function renderAttestationChart(attestations) {
+      const statusMap = { verified: 'Verified', not_available: 'Not Available', failed: 'Failed', disabled: 'Disabled' };
+      const entries = Object.entries(attestations)
+        .map(([k, v]) => [statusMap[k] || k, v])
+        .filter(([, v]) => v > 0)
+        .sort((a, b) => b[1] - a[1]);
+      const total = entries.reduce((s, [, v]) => s + v, 0);
+      toggle('attestation', total > 0);
+      if (!total) return;
+      const labels = entries.map(([k]) => k);
+      doughnut('attestation', labels, entries.map(([, v]) => v), labels.map((l) => ATTESTATION_COLORS[l] || C.navy20), total);
+      const verified = attestations.verified || 0;
+      $('attestation-summary').innerHTML =
+        `<strong class="ok">${fmt(verified)}</strong> verified out of ${fmt(total)} wheels (${(verified / total * 100).toFixed(1)}%)`;
+    }
+
+    function renderPublishersChart(publishers) {
+      const entries = Object.entries(publishers).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+      toggle('publishers', entries.length > 0);
+      if (!entries.length) return;
+      const labels = entries.map(([k]) => k);
+      doughnut('publishers', labels, entries.map(([, v]) => v), labels.map((l) => PUBLISHER_COLORS[l] || C.navy20));
+    }
+
+    function renderTimeSeries(series) {
+      if (!series.length) return;
+      const labels = series.map((p) => new Date(p.timestamp * 1000));
+
+      draw('packagesTime', 'packages-time-chart', {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'New packages explored', data: series.map((p) => p.packages.new_explored), backgroundColor: C.navy, borderRadius: 3 },
+            { label: 'With SBOM', data: series.map((p) => p.packages.new_with_sbom), backgroundColor: C.success, borderRadius: 3 },
+          ],
+        },
+        options: {
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { position: 'bottom' } },
+          scales: { x: TIME_SCALE, y: Y_SCALE },
+        },
+      });
+
+      let cumExplored = 0, cumWithSbom = 0;
+      const explored = [], withSbom = [];
+      for (const p of series) {
+        explored.push(cumExplored += p.packages.new_explored);
+        withSbom.push(cumWithSbom += p.packages.new_with_sbom);
+      }
+      draw('sbomTime', 'sbom-time-chart', {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Total explored', data: explored, borderColor: C.navy, backgroundColor: C.navyTint, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+            { label: 'With SBOM', data: withSbom, borderColor: C.success, backgroundColor: C.successTint, fill: true, tension: 0.3, pointRadius: 0, borderWidth: 2 },
+          ],
+        },
+        options: {
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { position: 'bottom' } },
+          scales: { x: TIME_SCALE, y: Y_SCALE },
+        },
+      });
+    }
+
+    // entries: [{label, count, href?}], sorted descending.
+    function renderBarList(id, entries) {
+      const el = $(id);
+      if (!entries.length) {
+        el.innerHTML = '<li class="subtle">No data yet</li>';
+        return;
+      }
+      const max = entries[0].count;
+      el.innerHTML = entries.map((e) => {
+        const pct = max > 0 ? e.count / max * 100 : 0;
+        const label = e.href ? `<a href="${esc(e.href)}" class="link">${esc(e.label)}</a>` : esc(e.label);
+        return `<li>
+          <span class="label" title="${esc(e.label)}">${label}</span>
+          <span class="track"><span class="fill" style="width:${pct}%"></span></span>
+          <span class="count">${fmt(e.count)}</span>
+        </li>`;
+      }).join('');
+    }
+
+    const byCount = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([label, count]) => ({ label, count }));
+
+    function renderUsage(usage) {
+      $('usage-section').classList.remove('hidden');
+      $('usage-total-queries').textContent = fmt(usage.total_queries);
+      $('usage-qualifier-queries').textContent = fmt(usage.qualifier_queries);
+      $('usage-unique-packages').textContent = fmt(usage.top_packages.length);
+
+      renderBarList('usage-top-packages', usage.top_packages.map((p) => {
+        const [name, ver = ''] = p.package.split('@');
+        return {
+          label: p.package,
+          count: p.queries,
+          href: `/package/${encodeURIComponent(name)}/${encodeURIComponent(ver)}`,
+        };
+      }));
+      renderBarList('usage-endpoints', byCount(usage.endpoints));
+      renderBarList('usage-os-qualifiers', byCount(usage.qualifiers.os));
+      renderBarList('usage-arch-qualifiers', byCount(usage.qualifiers.arch));
+
+      toggle('usage-daily', usage.daily_queries.length > 0);
+      if (usage.daily_queries.length) {
+        draw('usageDaily', 'usage-daily-chart', {
+          type: 'bar',
+          data: {
+            labels: usage.daily_queries.map((d) => new Date(d.timestamp * 1000)),
+            datasets: [{ label: 'Queries', data: usage.daily_queries.map((d) => d.queries), backgroundColor: C.navy, borderRadius: 3 }],
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: { x: TIME_SCALE, y: Y_SCALE },
+          },
+        });
+      }
+
+      $('usage-recent-body').innerHTML = usage.recent.map((q) => {
+        const platform = [q.os, q.arch].filter(Boolean).join('/') || '–';
+        const sbom = q.has_sbom ? '<span class="tag tag-success">Yes</span>' : '<span class="tag">No</span>';
+        return `<tr>
+          <td class="mono">${esc(q.package)}</td>
+          <td class="mono muted">${esc(q.version)}</td>
+          <td class="muted">${esc(platform)}</td>
+          <td>${sbom}</td>
+          <td class="num subtle">${formatTimeAgo(q.ts)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function formatTimeAgo(ts) {
+      const seconds = Math.floor(Date.now() / 1000 - ts);
+      if (seconds < 60) return 'just now';
+      if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
+      if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
+      return Math.floor(seconds / 86400) + 'd ago';
+    }
+
+    async function refreshAll() {
+      try {
+        const responses = await Promise.all(['/stats', '/stats/timeseries', '/stats/usage'].map((u) => fetch(u)));
+        for (const r of responses) if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const [stats, timeseries, usage] = await Promise.all(responses.map((r) => r.json()));
+
+        $('loading').classList.add('hidden');
+        $('error').classList.add('hidden');
+        $('dashboard').classList.remove('hidden');
+
+        renderSummary(stats);
+        renderTimeSeries(timeseries);
+        renderUsage(usage);
+      } catch (err) {
+        $('loading').classList.add('hidden');
+        $('error').classList.remove('hidden');
+        $('error').textContent = 'Failed to load stats: ' + err.message;
+      }
+    }
+
+    document.querySelectorAll('[data-copy]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        navigator.clipboard.writeText($(btn.dataset.copy).textContent).then(() => {
+          btn.textContent = 'Copied';
+          setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        });
+      });
+    });
+
+    refreshAll();
+    setInterval(refreshAll, 60000);
+  </script>
+{% endblock %}
