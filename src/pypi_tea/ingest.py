@@ -7,6 +7,7 @@ again: re-resolving a known release costs one PyPI JSON request.
 import asyncio
 import hashlib
 import logging
+from concurrent.futures import ProcessPoolExecutor
 from typing import Any
 
 import httpx
@@ -29,6 +30,26 @@ _MAX_INFO_TEXT = 2000
 RETRY_PREFIX = "retryable: "
 # Attestation results worth keeping; anything else is re-checked on the next resolve.
 _FINAL_ATTESTATION = frozenset({"verified", "not_available"})
+
+
+_validation_pool: ProcessPoolExecutor | None = None
+
+
+async def _validate(content: str, fmt: str, media_type: str) -> bool:
+    """Schema-validate an SBOM off the event loop's GIL (see settings.validation_processes)."""
+    global _validation_pool
+    if settings.validation_processes <= 0:
+        return await asyncio.to_thread(validate_sbom, content, fmt, media_type)
+    if _validation_pool is None:
+        _validation_pool = ProcessPoolExecutor(max_workers=settings.validation_processes)
+    return await asyncio.get_running_loop().run_in_executor(_validation_pool, validate_sbom, content, fmt, media_type)
+
+
+def shutdown_validation_pool() -> None:
+    global _validation_pool
+    if _validation_pool is not None:
+        _validation_pool.shutdown(wait=False, cancel_futures=True)
+        _validation_pool = None
 
 
 def _trim_info(info: dict[str, Any]) -> dict[str, Any]:
@@ -54,7 +75,7 @@ async def _inspect_wheel(client: httpx.AsyncClient, wheel: WheelInfo) -> tuple[l
         if fmt is None or media_type is None:
             logger.warning("unrecognised SBOM format in %s: %s", wheel.filename, path)
             continue
-        valid = await asyncio.to_thread(validate_sbom, content, fmt, media_type)
+        valid = await _validate(content, fmt, media_type)
         sboms.append(
             SbomRecord(
                 uuid=artifact_uuid(wheel.url, path),

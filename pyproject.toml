@@ -10,6 +10,10 @@ dependencies = [
     "fastapi>=0.115",
     "anyio>=4.0",
     "httpx>=0.27",
+    # httpcore imports sniffio on every connection-pool operation and anyio 4.x
+    # no longer pulls it in; without it each import fails after a sys.path scan
+    # on the event loop.
+    "sniffio>=1.3",
     "jinja2>=3.1",
     "libtea>=0.4.0",
     "packaging>=24.0",
