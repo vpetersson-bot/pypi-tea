@@ -52,6 +52,7 @@ Request flow for a TEI/PURL: route handler → `lookup.ensure_release()` → sto
 - **`worker.py`** — `pypi-tea-worker`: N job loops plus a scheduler (listing rebuild as soon as the catalog changes, at most a 10% duty cycle; weekly refresh)
 - **`tea.py`** — pure builders from stored records to `libtea.models`
 - **`usage.py`** — in-memory usage counters flushed to SQLite every 10 s
+- **`analytics.py`** — PostHog events (queued, sent by a background thread; never raises). `EdgeMiddleware` binds the caller's anonymous id per request; browser events come from `templates/_analytics.html` and `data-ph-*` attributes
 - **`services/`** — `pypi.py` (JSON API, wheel platform filter), `wheel_reader.py` (async range-request ZIP reader), `sbom_format.py`, `attestation.py`, `uuids.py`
 - **`routes/`** — `tea.py` (all TEA endpoints), `pages.py` (HTML), `seo.py` (robots, sharded sitemap), `stats.py`
 

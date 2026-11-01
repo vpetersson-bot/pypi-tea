@@ -75,8 +75,8 @@
       <h1>SBOM coverage across PyPI</h1>
       <p class="lede">Which Python packages ship a CycloneDX or SPDX SBOM inside their wheels, whether it validates, and whether the wheel carries a PEP 740 attestation. Every SBOM found is served over TEA.</p>
       <div class="hero-actions">
-        <a class="btn btn-navy" href="/packages">Browse packages</a>
-        <a class="btn btn-secondary" href="#tea">Query with TEA</a>
+        <a class="btn btn-navy" href="/packages" data-ph-event="hero_cta_clicked" data-ph-cta="browse_packages">Browse packages</a>
+        <a class="btn btn-secondary" href="#tea" data-ph-event="hero_cta_clicked" data-ph-cta="query_with_tea">Query with TEA</a>
       </div>
     </div>
   </section>
@@ -192,7 +192,7 @@
           <p>The <a href="https://github.com/CycloneDX/transparency-exchange-api" class="link" rel="noopener">Transparency Exchange API (TEA)</a> is an open standard for discovering SBOMs. Query this server with <a href="https://pypi.org/project/libtea/" class="link" rel="noopener">tea-cli</a>:</p>
         </div>
         <div class="code">
-          <button type="button" class="copy" data-copy="tea-example">Copy</button>
+          <button type="button" class="copy" data-copy="tea-example" data-ph-event="code_copied" data-ph-snippet="tea_cli_example">Copy</button>
           <pre><code id="tea-example"><span class="c"># Install the TEA CLI</span>
 $ pip install libtea[cli]
 
@@ -221,7 +221,7 @@ $ tea-cli search-releases --id-type PURL \
           <h2>Ship SBOMs for your own releases</h2>
           <p>sbomify collects, shares and monitors SBOMs across every product you ship.</p>
         </div>
-        <a class="btn btn-secondary" href="https://sbomify.com/">Learn more</a>
+        <a class="btn btn-secondary" href="https://sbomify.com/" data-ph-event="sbomify_cta_clicked" data-ph-cta="learn_more" data-ph-placement="dashboard">Learn more</a>
       </aside>
     </div>
   </div>
@@ -499,7 +499,8 @@ $ tea-cli search-releases --id-type PURL \
       const max = entries[0].count;
       el.innerHTML = entries.map((e) => {
         const pct = max > 0 ? e.count / max * 100 : 0;
-        const label = e.href ? `<a href="${esc(e.href)}" class="link">${esc(e.label)}</a>` : esc(e.label);
+        const track = e.track ? ` data-ph-event="package_clicked" data-ph-source="${esc(e.track)}" data-ph-target-package="${esc(e.label)}"` : '';
+        const label = e.href ? `<a href="${esc(e.href)}" class="link"${track}>${esc(e.label)}</a>` : esc(e.label);
         return `<li>
           <span class="label" title="${esc(e.label)}">${label}</span>
           <span class="track"><span class="fill" style="width:${pct}%"></span></span>
@@ -522,6 +523,7 @@ $ tea-cli search-releases --id-type PURL \
           label: p.package,
           count: p.queries,
           href: `/package/${encodeURIComponent(name)}/${encodeURIComponent(ver)}`,
+          track: 'dashboard_top_packages',
         };
       }));
       renderBarList('usage-endpoints', byCount(usage.endpoints));
