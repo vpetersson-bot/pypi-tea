@@ -22,7 +22,7 @@ import httpx
 
 from pypi_tea import db, jobs, sentry, store
 from pypi_tea.config import settings
-from pypi_tea.ingest import ingest_release, latest_version
+from pypi_tea.ingest import ingest_release, latest_version, shutdown_validation_pool
 
 if os.environ.get("JOURNAL_STREAM"):
     _LOG_FORMAT = "%(levelname)s %(name)s %(message)s"
@@ -102,12 +102,14 @@ async def _job_loop(client: httpx.AsyncClient, stop: asyncio.Event) -> None:
         except Exception as e:
             kept = await asyncio.to_thread(_retry, job, f"{type(e).__name__}: {e}")
             log = logger.warning if kept else logger.error
+            # Several httpx errors (ConnectTimeout, ReadError) stringify to "".
             log(
-                "job %s@%s failed (attempt %d%s): %s",
+                "job %s@%s failed (attempt %d%s): %s: %s",
                 job.name,
                 job.version,
                 job.attempts,
                 "" if kept else ", giving up",
+                type(e).__name__,
                 e,
             )
         else:
@@ -210,6 +212,7 @@ async def run(stop: asyncio.Event, concurrency: int | None = None, schedule: boo
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            shutdown_validation_pool()
 
 
 def cli() -> None:

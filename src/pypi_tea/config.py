@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Worker: concurrent ingest jobs, and per-job concurrent wheel fetches.
     worker_concurrency: int = 16
     wheel_concurrency: int = 4
+    # Processes for SBOM schema validation. Validating a large CycloneDX
+    # document is seconds of pure-Python CPU; run in threads it holds the GIL
+    # and starves the worker's event loop until upstream connects time out.
+    # 0 validates in a thread (development and tests).
+    validation_processes: int = 2
     # Run the ingest worker inside the API process (development and tests only).
     embedded_worker: bool = False
 
