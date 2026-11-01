@@ -20,7 +20,7 @@ from importlib.metadata import version as pkg_version
 
 import httpx
 
-from pypi_tea import db, jobs, store
+from pypi_tea import db, jobs, sentry, store
 from pypi_tea.config import settings
 from pypi_tea.ingest import ingest_release, latest_version
 
@@ -216,6 +216,7 @@ def cli() -> None:
     logging.basicConfig(level=logging.INFO, format=_LOG_FORMAT)
     # httpx logs every request at INFO: several per wheel, thousands a minute during a backfill.
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    sentry.init("worker")
 
     async def main() -> None:
         stop = asyncio.Event()
