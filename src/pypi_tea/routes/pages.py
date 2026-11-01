@@ -30,14 +30,14 @@ LIST_CACHE = "public, max-age=300, s-maxage=900, stale-while-revalidate=3600, st
 NOT_FOUND_CACHE = "public, max-age=600, s-maxage=3600"
 
 
-def _render(template_name: str, **ctx: Any) -> str:
-    ctx.setdefault("version", _VERSION)
+def render(template_name: str, **ctx: Any) -> str:
+    ctx.setdefault("app_version", _VERSION)
     ctx.setdefault("server_root_url", settings.server_root_url)
     return _jinja_env.get_template(template_name).render(**ctx)
 
 
 def _not_found() -> HTMLResponse:
-    return HTMLResponse(_render("404.html"), status_code=404, headers={"Cache-Control": NOT_FOUND_CACHE})
+    return HTMLResponse(render("404.html"), status_code=404, headers={"Cache-Control": NOT_FOUND_CACHE})
 
 
 def page_context(release: ReleaseRecord) -> dict[str, Any]:
@@ -93,11 +93,11 @@ async def package_page(name: str, pkg_version: str) -> Response:
         if release is None and await read(jobs.is_queued, name, pkg_version):
             # Queued (e.g. during a backfill): tell crawlers to come back rather than drop the page.
             return HTMLResponse(
-                _render("404.html"), status_code=503, headers={"Retry-After": "3600", "Cache-Control": "no-store"}
+                render("404.html"), status_code=503, headers={"Retry-After": "3600", "Cache-Control": "no-store"}
             )
         return _not_found()
     canonical_url = f"{settings.server_root_url}/package/{name}/{pkg_version}"
-    html = _render("package.html", **page_context(release), canonical_url=canonical_url)
+    html = render("package.html", **page_context(release), canonical_url=canonical_url, nav="packages")
     return HTMLResponse(html, headers={"Cache-Control": PAGE_CACHE})
 
 
@@ -121,8 +121,9 @@ async def packages_listing(page: int = Query(1, ge=1), format: str | None = Quer
         query_parts.append(f"page={page}")
     canonical_url = f"{settings.server_root_url}/packages" + ("?" + "&".join(query_parts) if query_parts else "")
 
-    html = _render(
+    html = render(
         "packages.html",
+        nav="packages",
         packages=packages,
         total=total,
         page=page,

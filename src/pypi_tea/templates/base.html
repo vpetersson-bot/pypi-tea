@@ -6,33 +6,72 @@
   <title>{% block title %}pypi-tea{% endblock %}</title>
   {% block meta %}{% endblock %}
   <meta name="robots" content="index, follow">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="theme-color" content="#25293f">
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+  <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
+  <link rel="preload" href="/static/fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/css/site.css?v={{ app_version }}">
+  {% block head %}{% endblock %}
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen">
-  <div class="max-w-6xl mx-auto px-6 py-10">
-    <header class="mb-10 flex items-center justify-between">
-      <div>
-        <a href="/" class="text-3xl font-bold tracking-tight hover:text-white">pypi-tea</a>
-        <p class="text-gray-400 mt-1">SBOM Coverage for PyPI Packages</p>
-      </div>
-      <nav class="flex gap-4 text-sm">
-        <a href="/" class="text-gray-400 hover:text-white transition-colors">Dashboard</a>
-        <a href="/packages" class="text-gray-400 hover:text-white transition-colors">Browse Packages</a>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <img src="/static/img/logo.svg" alt="sbomify" width="117" height="22">
+        <span>PyPI TEA</span>
+      </a>
+      <nav class="nav" aria-label="Main">
+        <a href="/"{% if nav == "dashboard" %} aria-current="page"{% endif %}>Dashboard</a>
+        <a href="/packages"{% if nav == "packages" %} aria-current="page"{% endif %}>Packages</a>
+        <a href="https://github.com/sbomify/pypi-tea" rel="noopener">GitHub</a>
       </nav>
-    </header>
+      <a class="btn btn-primary" href="https://app.sbomify.com">Start free</a>
+    </div>
+  </header>
 
+  <main id="main">
     {% block content %}{% endblock %}
+  </main>
 
-    <footer class="mt-16 pt-8 border-t border-gray-800 text-gray-500 text-xs flex items-center justify-between">
-      <div>
-        <a href="https://github.com/sbomify/pypi-tea" class="hover:text-gray-300">GitHub</a>
-        <span class="mx-2">&middot;</span>
-        <a href="https://sbomify.com" class="hover:text-gray-300">sbomify</a>
-        <span class="mx-2">&middot;</span>
-        <a href="https://pypi.org/project/libtea/" class="hover:text-gray-300">libtea</a>
+  <footer class="site-footer">
+    <div class="wrap footer-top">
+      <div class="footer-brand">
+        <a href="/"><img src="/static/img/logo.svg" alt="sbomify" width="117" height="22"></a>
+        <p>SBOMs shipped inside PyPI wheels, served over the Transparency Exchange API.</p>
       </div>
-      <div>pypi-tea {{ version }}</div>
-    </footer>
-  </div>
+      <nav aria-label="Browse">
+        <h2>Browse</h2>
+        <ul>
+          <li><a href="/">Dashboard</a></li>
+          <li><a href="/packages">All packages</a></li>
+          <li><a href="/packages?format=CycloneDX">CycloneDX SBOMs</a></li>
+          <li><a href="/packages?format=SPDX">SPDX SBOMs</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="Project">
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/sbomify/pypi-tea" rel="noopener">pypi-tea on GitHub</a></li>
+          <li><a href="https://pypi.org/project/libtea/" rel="noopener">libtea</a></li>
+          <li><a href="https://github.com/CycloneDX/transparency-exchange-api" rel="noopener">TEA specification</a></li>
+        </ul>
+      </nav>
+      <nav aria-label="sbomify">
+        <h2>sbomify</h2>
+        <ul>
+          <li><a href="https://sbomify.com/">Product</a></li>
+          <li><a href="https://sbomify.com/blog/">Blog</a></li>
+          <li><a href="https://app.sbomify.com">Sign in</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div class="wrap footer-bottom">
+      <p>A free resource from <a href="https://sbomify.com/">sbomify</a>. Package data from PyPI.</p>
+      <p>pypi-tea {{ app_version }}</p>
+    </div>
+  </footer>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

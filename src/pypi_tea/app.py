@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pypi_tea import db, sentry
@@ -22,7 +23,8 @@ sentry.init("api")
 logger = logging.getLogger("pypi_tea.app")
 
 _STATIC_DIR = Path(__file__).parent / "static"
-_INDEX_HTML = (_STATIC_DIR / "index.html").read_text().replace("{{VERSION}}", version("pypi-tea"))
+# The dashboard is static apart from the version; its data loads from /stats.
+_INDEX_HTML = pages.render("index.html", nav="dashboard")
 
 
 async def _flush_usage_forever() -> None:
@@ -95,6 +97,7 @@ app.include_router(stats.router)
 app.include_router(stats.router, prefix=_version_prefix)
 app.include_router(pages.router)
 app.include_router(seo.router)
+app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -115,6 +118,8 @@ def _ping(conn: sqlite3.Connection) -> None:
 # Edge cache rules for JSON responses (HTML routes set their own). Wheels are
 # immutable, so anything derived from one can be cached for a long time.
 _CACHE_RULES: tuple[tuple[str, str], ...] = (
+    # Fonts and images never change in place; the stylesheet URL carries ?v=<version>.
+    ("/static/", "public, max-age=86400, s-maxage=604800, stale-if-error=604800"),
     ("/artifact/", "public, max-age=86400, s-maxage=604800, stale-if-error=604800"),
     ("/component", "public, max-age=86400, s-maxage=604800, stale-if-error=604800"),
     ("/productRelease/", "public, max-age=3600, s-maxage=86400, stale-if-error=604800"),

@@ -21,88 +21,66 @@
 {% endblock %}
 
 {% block content %}
-  <section>
-    <header class="mb-8">
-      <h1 class="text-3xl font-bold">{% if active_format %}{{ active_format }} SBOMs{% else %}Packages with SBOMs{% endif %}</h1>
-      <p class="text-gray-400 mt-2">{{ total }} package{{ 's' if total != 1 else '' }} found</p>
+  <div class="wrap">
+    <header class="page-head">
+      <span class="eyebrow-chip">PyPI packages</span>
+      <h1>{% if active_format %}{{ active_format }} SBOMs{% else %}Packages with SBOMs{% endif %}</h1>
+      <p class="lede">{{ "{:,}".format(total) }} package{{ 's' if total != 1 else '' }} found</p>
     </header>
 
-    <!-- Format filter -->
-    <nav class="flex gap-2 mb-8" aria-label="Filter by SBOM format">
-      <a href="/packages"
-         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {% if not active_format %}bg-cyan-600 text-white{% else %}bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700{% endif %}">
-        All
-      </a>
-      <a href="/packages?format=CycloneDX"
-         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {% if active_format == 'CycloneDX' %}bg-cyan-600 text-white{% else %}bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700{% endif %}">
-        CycloneDX
-      </a>
-      <a href="/packages?format=SPDX"
-         class="px-4 py-2 rounded-lg text-sm font-medium transition-colors {% if active_format == 'SPDX' %}bg-purple-600 text-white{% else %}bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700{% endif %}">
-        SPDX
-      </a>
+    <nav class="segmented toolbar" aria-label="Filter by SBOM format">
+      <a href="/packages"{% if not active_format %} aria-current="page"{% endif %}>All</a>
+      <a href="/packages?format=CycloneDX"{% if active_format == 'CycloneDX' %} aria-current="page"{% endif %}>CycloneDX</a>
+      <a href="/packages?format=SPDX"{% if active_format == 'SPDX' %} aria-current="page"{% endif %}>SPDX</a>
     </nav>
 
     {% if packages %}
-    <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="border-b border-gray-800 text-left text-xs text-gray-500 uppercase tracking-wide">
-            <th class="px-6 py-3">Package</th>
-            <th class="px-6 py-3">Version</th>
-            <th class="px-6 py-3">SBOM Formats</th>
-            <th class="px-6 py-3"></th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-800">
-          {% for pkg in packages %}
-          <tr class="hover:bg-gray-800/50 transition-colors">
-            <td class="px-6 py-4 font-medium">
-              <a href="/package/{{ pkg.name }}/{{ pkg.version }}" class="text-cyan-400 hover:text-cyan-300">{{ pkg.name }}</a>
-            </td>
-            <td class="px-6 py-4 text-gray-400">{{ pkg.version }}</td>
-            <td class="px-6 py-4">
-              <div class="flex flex-wrap gap-1">
-                {% for fmt in pkg.formats %}
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if 'CycloneDX' in fmt %}bg-cyan-900/50 text-cyan-300{% elif 'SPDX' in fmt %}bg-purple-900/50 text-purple-300{% else %}bg-gray-800 text-gray-300{% endif %}">{{ fmt }}</span>
-                {% endfor %}
-              </div>
-            </td>
-            <td class="px-6 py-4 text-right">
-              <a href="/package/{{ pkg.name }}/{{ pkg.version }}" class="text-gray-500 hover:text-white text-xs">View SBOM &rarr;</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Package</th>
+              <th scope="col">Version</th>
+              <th scope="col">SBOM formats</th>
+              <th scope="col"><span class="visually-hidden">Link</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for pkg in packages %}
+            <tr>
+              <td><a href="/package/{{ pkg.name }}/{{ pkg.version }}" class="pkg-link">{{ pkg.name }}</a></td>
+              <td class="mono muted">{{ pkg.version }}</td>
+              <td>
+                <div class="tags">
+                  {% for fmt in pkg.formats %}<span class="tag">{{ fmt }}</span>{% endfor %}
+                </div>
+              </td>
+              <td class="num"><a href="/package/{{ pkg.name }}/{{ pkg.version }}" class="row-link">View SBOM &rarr;</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
 
-    <!-- Pagination -->
     {% if total_pages > 1 %}
-    <nav class="mt-6 flex items-center justify-center gap-2" aria-label="Pagination">
+    <nav class="pagination" aria-label="Pagination">
       {% if page > 1 %}
-      <a href="/packages?page={{ page - 1 }}{% if active_format %}&format={{ active_format }}{% endif %}"
-         class="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 text-sm transition-colors">
-        &larr; Previous
-      </a>
+      <a href="/packages?page={{ page - 1 }}{% if active_format %}&format={{ active_format }}{% endif %}" class="btn btn-secondary" rel="prev">&larr; Previous</a>
       {% endif %}
-      <span class="px-4 py-2 text-sm text-gray-500">
-        Page {{ page }} of {{ total_pages }}
-      </span>
+      <span>Page {{ page }} of {{ total_pages }}</span>
       {% if page < total_pages %}
-      <a href="/packages?page={{ page + 1 }}{% if active_format %}&format={{ active_format }}{% endif %}"
-         class="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 text-sm transition-colors">
-        Next &rarr;
-      </a>
+      <a href="/packages?page={{ page + 1 }}{% if active_format %}&format={{ active_format }}{% endif %}" class="btn btn-secondary" rel="next">Next &rarr;</a>
       {% endif %}
     </nav>
     {% endif %}
 
     {% else %}
-    <div class="text-center py-16 text-gray-500">
-      <p class="text-lg">No packages found{% if active_format %} with {{ active_format }} SBOMs{% endif %}.</p>
-      <p class="mt-2 text-sm">Packages appear here once they've been queried through the TEA API.</p>
+    <div class="card notice notice-sm">
+      <h2>No packages found{% if active_format %} with {{ active_format }} SBOMs{% endif %}.</h2>
+      <p>Packages appear here once they've been queried through the TEA API.</p>
     </div>
     {% endif %}
-  </section>
+  </div>
 {% endblock %}
