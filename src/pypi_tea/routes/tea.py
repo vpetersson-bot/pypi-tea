@@ -10,9 +10,9 @@ from libtea.exceptions import TeaDiscoveryError
 from libtea.models import ErrorResponse, ErrorType, IdentifierType, TeaEndpoint, TeaWellKnown
 from libtea.server import tea_datetime_serializer
 
-from pypi_tea import store, tea
+from pypi_tea import analytics, store, tea
 from pypi_tea.config import settings
-from pypi_tea.lookup import ensure_release, read
+from pypi_tea.lookup import Overloaded, Pending, ensure_release, read
 from pypi_tea.models import Entity, ReleaseRecord, WheelRecord
 from pypi_tea.services.pypi import filter_wheels_by_platform
 from pypi_tea.usage import usage
@@ -37,19 +37,52 @@ def _page(results: list[dict[str, Any]], offset: int, size: int, total: int) -> 
     }
 
 
-async def _resolve_purl(purl: str) -> tuple[ReleaseRecord, list[WheelRecord]] | None:
-    """Versioned PURL -> stored release and the wheels its qualifiers select. None if not on PyPI."""
+async def _resolve_purl(purl: str, source: str) -> tuple[ReleaseRecord, list[WheelRecord]] | None:
+    """Versioned PURL -> stored release and the wheels its qualifiers select. None if not on PyPI.
+
+    `source` names the endpoint asking, for analytics.
+    """
     try:
         name, version, qualifiers = tea.parse_purl(purl)
     except ValueError:
+        analytics.capture("sbom_lookup_failed", {"source": source, "reason": "invalid_purl"})
         return None
+    failed = {"source": source, "package": name, "version": version or None}
     if not version:
+        analytics.capture("sbom_lookup_failed", failed | {"reason": "unversioned"})
         return None
-    release = await ensure_release(name, version)
+    try:
+        release = await ensure_release(name, version)
+    except Overloaded:
+        analytics.capture("sbom_lookup_failed", failed | {"reason": "overloaded"})
+        raise
+    except Pending:
+        analytics.capture("sbom_lookup_failed", failed | {"reason": "pending"})
+        raise
     if release is None:
+        analytics.capture("sbom_lookup_failed", failed | {"reason": "not_on_pypi"})
         return None
     wheels = filter_wheels_by_platform(release.wheels, qualifiers.os_name, qualifiers.arch)
-    usage.query(name, version, qualifiers.os_name, qualifiers.arch, any(w.sboms for w in wheels))
+    has_sbom = any(w.sboms for w in wheels)
+    usage.query(name, version, qualifiers.os_name, qualifiers.arch, has_sbom)
+    sboms = [s for w in wheels for s in w.sboms]
+    analytics.capture(
+        "sbom_lookup",
+        {
+            "source": source,
+            "package": name,
+            "version": version,
+            "os": qualifiers.os_name,
+            "arch": qualifiers.arch,
+            "platform_qualified": bool(qualifiers.os_name or qualifiers.arch),
+            "has_sbom": has_sbom,
+            "wheel_count": len(wheels),
+            "sbom_count": len(sboms),
+            "sbom_formats": sorted({s.family for s in sboms}),
+            "has_invalid_sbom": any(not s.valid for s in sboms),
+            "attested": any((w.attestation or {}).get("status") == "verified" for w in wheels),
+        },
+    )
     return release, wheels
 
 
@@ -86,8 +119,11 @@ async def discovery(tei: str = Query(...)) -> Any:
     except TeaDiscoveryError:
         return not_found()
     if tei_type != "purl":
+        analytics.capture(
+            "sbom_lookup_failed", {"source": "discovery", "reason": "unsupported_tei", "tei_type": tei_type}
+        )
         return not_found()
-    resolved = await _resolve_purl(identifier)
+    resolved = await _resolve_purl(identifier, "discovery")
     if resolved is None:
         return not_found()
     release, _ = resolved
@@ -108,7 +144,7 @@ async def list_or_search_products(
     if idType and idValue:
         if idType != IdentifierType.PURL:
             return _page([], pageOffset, size, 0)
-        resolved = await _resolve_purl(idValue)
+        resolved = await _resolve_purl(idValue, "products")
         if resolved is not None:
             return _page([tea.product(resolved[0].name).model_dump(by_alias=True)], pageOffset, size, 1)
         try:
@@ -165,7 +201,7 @@ async def list_or_search_product_releases(
     if idType and idValue:
         if idType != IdentifierType.PURL:
             return _page([], pageOffset, size, 0)
-        resolved = await _resolve_purl(idValue)
+        resolved = await _resolve_purl(idValue, "productReleases")
         if resolved is None:
             return _page([], pageOffset, size, 0)
         release, wheels = resolved
@@ -280,6 +316,18 @@ async def download_artifact(uuid: str) -> Any:
     if found is None:
         return not_found()
     content, media_type = found
+    if analytics.enabled():
+        entity = await read(store.get_entity, uuid)
+        analytics.capture(
+            "sbom_downloaded",
+            {
+                "artifact_uuid": uuid,
+                "package": entity.name if entity else None,
+                "version": entity.version if entity else None,
+                "media_type": media_type,
+                "size_bytes": len(content),
+            },
+        )
     return Response(content=content, media_type=media_type)
 
 
@@ -288,7 +336,7 @@ async def download_artifact(uuid: str) -> Any:
 
 @router.get("/attestation/{package}/{version}")
 async def get_attestation(package: str, version: str) -> Any:
-    resolved = await _resolve_purl(f"pkg:pypi/{package}@{version}")
+    resolved = await _resolve_purl(f"pkg:pypi/{package}@{version}", "attestation")
     if resolved is None:
         return JSONResponse(status_code=404, content={"error": "Package or version not found"})
     release, wheels = resolved

@@ -107,6 +107,25 @@ All settings are configurable via environment variables with the `PYPI_TEA_` pre
 | `PYPI_TEA_WORKER_CONCURRENCY` | `16` | Releases the worker resolves at once |
 | `PYPI_TEA_WHEEL_CONCURRENCY` | `4` | Wheels inspected at once within one release |
 | `PYPI_TEA_EMBEDDED_WORKER` | `false` | Run the worker inside the API process (development/tests only) |
+| `PYPI_TEA_POSTHOG_API_KEY` | sbomify's project key | PostHog project key for analytics; set it empty to turn analytics off |
+| `PYPI_TEA_POSTHOG_HOST` | `https://us.i.posthog.com` | PostHog ingestion host |
+
+### Analytics
+
+pypi-tea sends usage events to [PostHog](https://posthog.com) so we can see how the service is used. Nobody signs in, so events are anonymous and create no person profiles. Server-side, a client's id is a keyed hash of its IP and User-Agent that changes daily. Neither value is sent; only the client family and version parsed from the User-Agent (`libtea`, `curl`, `browser`, ...) are.
+
+| Event | Sent by | Properties |
+|---|---|---|
+| `tea_api_called` | API | `endpoint`, `status_code`, `versioned_url`, `duration_ms`, `client`, `client_version` |
+| `sbom_lookup` | API | `source` endpoint, `package`, `version`, `os`, `arch`, `platform_qualified`, `has_sbom`, `wheel_count`, `sbom_count`, `sbom_formats`, `has_invalid_sbom`, `attested` |
+| `sbom_lookup_failed` | API | `source`, `reason` (`invalid_purl`, `unversioned`, `unsupported_tei`, `not_on_pypi`, `pending`, `overloaded`), `package`, `version` |
+| `sbom_downloaded` | API | `artifact_uuid`, `package`, `version`, `media_type`, `size_bytes` |
+| `release_indexed` | worker | releases indexed because someone looked them up: `package`, `version`, `on_pypi`, `has_sbom`, `sbom_count`, `sbom_formats`, `duration_ms` |
+| `$pageview`, `$pageleave` | browser | tagged with `page_type` (`dashboard`, `package`, `package_list`, `not_found`) and the page's `package`, `version`, `sbom_formats` or `filter_format` |
+| `sbomify_cta_clicked` | browser | clicks through to sbomify (`cta`: `start_free`, `learn_more`, `product`, `sign_in`; `placement`: where on the site) |
+| `sbom_download_clicked`, `package_clicked`, `package_list_filtered`, `package_list_paginated`, `hero_cta_clicked`, `code_copied`, `external_link_clicked`, `nav_clicked` | browser | from `data-ph-*` attributes on the clicked element |
+
+HTML pages and SBOM downloads are mostly answered by the edge cache, so their server-side events only count cache misses. The browser events cover what visitors do on the site. To tag a new element, give it `data-ph-event="name"` and a `data-ph-<property>` attribute for each property.
 
 Error tracking uses Sentry's own variables and applies to the API, the worker and `pypi-tea-refresh` alike (events carry a `component` tag):
 

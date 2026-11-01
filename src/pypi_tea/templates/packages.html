@@ -29,9 +29,9 @@
     </header>
 
     <nav class="segmented toolbar" aria-label="Filter by SBOM format">
-      <a href="/packages"{% if not active_format %} aria-current="page"{% endif %}>All</a>
-      <a href="/packages?format=CycloneDX"{% if active_format == 'CycloneDX' %} aria-current="page"{% endif %}>CycloneDX</a>
-      <a href="/packages?format=SPDX"{% if active_format == 'SPDX' %} aria-current="page"{% endif %}>SPDX</a>
+      <a href="/packages" data-ph-event="package_list_filtered" data-ph-filter-format="all"{% if not active_format %} aria-current="page"{% endif %}>All</a>
+      <a href="/packages?format=CycloneDX" data-ph-event="package_list_filtered" data-ph-filter-format="CycloneDX"{% if active_format == 'CycloneDX' %} aria-current="page"{% endif %}>CycloneDX</a>
+      <a href="/packages?format=SPDX" data-ph-event="package_list_filtered" data-ph-filter-format="SPDX"{% if active_format == 'SPDX' %} aria-current="page"{% endif %}>SPDX</a>
     </nav>
 
     {% if packages %}
@@ -49,14 +49,14 @@
           <tbody>
             {% for pkg in packages %}
             <tr>
-              <td><a href="/package/{{ pkg.name }}/{{ pkg.version }}" class="pkg-link">{{ pkg.name }}</a></td>
+              <td><a href="/package/{{ pkg.name }}/{{ pkg.version }}" class="pkg-link" data-ph-event="package_clicked" data-ph-source="package_list" data-ph-target-package="{{ pkg.name }}" data-ph-target-version="{{ pkg.version }}">{{ pkg.name }}</a></td>
               <td class="mono muted">{{ pkg.version }}</td>
               <td>
                 <div class="tags">
                   {% for fmt in pkg.formats %}<span class="tag">{{ fmt }}</span>{% endfor %}
                 </div>
               </td>
-              <td class="num"><a href="/package/{{ pkg.name }}/{{ pkg.version }}" class="row-link">View SBOM &rarr;</a></td>
+              <td class="num"><a href="/package/{{ pkg.name }}/{{ pkg.version }}" class="row-link" data-ph-event="package_clicked" data-ph-source="package_list" data-ph-target-package="{{ pkg.name }}" data-ph-target-version="{{ pkg.version }}">View SBOM &rarr;</a></td>
             </tr>
             {% endfor %}
           </tbody>
@@ -67,11 +67,11 @@
     {% if total_pages > 1 %}
     <nav class="pagination" aria-label="Pagination">
       {% if page > 1 %}
-      <a href="/packages?page={{ page - 1 }}{% if active_format %}&format={{ active_format }}{% endif %}" class="btn btn-secondary" rel="prev">&larr; Previous</a>
+      <a href="/packages?page={{ page - 1 }}{% if active_format %}&format={{ active_format }}{% endif %}" class="btn btn-secondary" rel="prev" data-ph-event="package_list_paginated" data-ph-direction="previous">&larr; Previous</a>
       {% endif %}
       <span>Page {{ page }} of {{ total_pages }}</span>
       {% if page < total_pages %}
-      <a href="/packages?page={{ page + 1 }}{% if active_format %}&format={{ active_format }}{% endif %}" class="btn btn-secondary" rel="next">Next &rarr;</a>
+      <a href="/packages?page={{ page + 1 }}{% if active_format %}&format={{ active_format }}{% endif %}" class="btn btn-secondary" rel="next" data-ph-event="package_list_paginated" data-ph-direction="next">Next &rarr;</a>
       {% endif %}
     </nav>
     {% endif %}

@@ -28,16 +28,21 @@ COUNT_TTL = 60.0
 PAGE_CACHE = "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400, stale-if-error=604800"
 LIST_CACHE = "public, max-age=300, s-maxage=900, stale-while-revalidate=3600, stale-if-error=86400"
 NOT_FOUND_CACHE = "public, max-age=600, s-maxage=3600"
+_NOT_FOUND_PAGE = {"page_type": "not_found"}
 
 
 def render(template_name: str, **ctx: Any) -> str:
     ctx.setdefault("app_version", _VERSION)
     ctx.setdefault("server_root_url", settings.server_root_url)
+    ctx.setdefault("posthog_api_key", settings.posthog_api_key)
+    ctx.setdefault("posthog_host", settings.posthog_host)
     return _jinja_env.get_template(template_name).render(**ctx)
 
 
 def _not_found() -> HTMLResponse:
-    return HTMLResponse(render("404.html"), status_code=404, headers={"Cache-Control": NOT_FOUND_CACHE})
+    return HTMLResponse(
+        render("404.html", analytics_page=_NOT_FOUND_PAGE), status_code=404, headers={"Cache-Control": NOT_FOUND_CACHE}
+    )
 
 
 def page_context(release: ReleaseRecord) -> dict[str, Any]:
@@ -93,11 +98,21 @@ async def package_page(name: str, pkg_version: str) -> Response:
         if release is None and await read(jobs.is_queued, name, pkg_version):
             # Queued (e.g. during a backfill): tell crawlers to come back rather than drop the page.
             return HTMLResponse(
-                render("404.html"), status_code=503, headers={"Retry-After": "3600", "Cache-Control": "no-store"}
+                render("404.html", analytics_page={"page_type": "package_pending"}),
+                status_code=503,
+                headers={"Retry-After": "3600", "Cache-Control": "no-store"},
             )
         return _not_found()
     canonical_url = f"{settings.server_root_url}/package/{name}/{pkg_version}"
-    html = render("package.html", **page_context(release), canonical_url=canonical_url, nav="packages")
+    ctx = page_context(release)
+    analytics_page = {
+        "page_type": "package",
+        "package": name,
+        "version": pkg_version,
+        "sbom_formats": ctx["formats"],
+        "attested": ctx["has_attestation"],
+    }
+    html = render("package.html", **ctx, canonical_url=canonical_url, nav="packages", analytics_page=analytics_page)
     return HTMLResponse(html, headers={"Cache-Control": PAGE_CACHE})
 
 
@@ -130,5 +145,6 @@ async def packages_listing(page: int = Query(1, ge=1), format: str | None = Quer
         total_pages=total_pages,
         active_format=format,
         canonical_url=canonical_url,
+        analytics_page={"page_type": "package_list", "filter_format": format or "all", "page": page},
     )
     return HTMLResponse(html, headers={"Cache-Control": LIST_CACHE})

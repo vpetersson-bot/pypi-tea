@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # Run the ingest worker inside the API process (development and tests only).
     embedded_worker: bool = False
 
+    # Product analytics (see analytics.py). The project key is public by design:
+    # the browser snippet ships it to every visitor. Set it empty to turn analytics off.
+    posthog_api_key: str = "phc_pbDJTxYmvCVsafKTuQNkYCLWYf5eTXKax6tLMPMHxXeu"
+    posthog_host: str = "https://us.i.posthog.com"
+
     model_config = {"env_prefix": "PYPI_TEA_"}
 
 

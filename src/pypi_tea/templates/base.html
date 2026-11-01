@@ -11,6 +11,7 @@
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png">
   <link rel="preload" href="/static/fonts/figtree-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/site.css?v={{ app_version }}">
+  {% include "_analytics.html" %}
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -23,11 +24,11 @@
         <span>PyPI TEA</span>
       </a>
       <nav class="nav" aria-label="Main">
-        <a href="/"{% if nav == "dashboard" %} aria-current="page"{% endif %}>Dashboard</a>
-        <a href="/packages"{% if nav == "packages" %} aria-current="page"{% endif %}>Packages</a>
-        <a href="https://github.com/sbomify/pypi-tea" rel="noopener">GitHub</a>
+        <a href="/" data-ph-event="nav_clicked" data-ph-target="dashboard"{% if nav == "dashboard" %} aria-current="page"{% endif %}>Dashboard</a>
+        <a href="/packages" data-ph-event="nav_clicked" data-ph-target="packages"{% if nav == "packages" %} aria-current="page"{% endif %}>Packages</a>
+        <a href="https://github.com/sbomify/pypi-tea" rel="noopener" data-ph-event="external_link_clicked" data-ph-link-type="github" data-ph-placement="header">GitHub</a>
       </nav>
-      <a class="btn btn-primary" href="https://app.sbomify.com">Start free</a>
+      <a class="btn btn-primary" href="https://app.sbomify.com" data-ph-event="sbomify_cta_clicked" data-ph-cta="start_free" data-ph-placement="header">Start free</a>
     </div>
   </header>
 
@@ -53,17 +54,17 @@
       <nav aria-label="Project">
         <h2>Project</h2>
         <ul>
-          <li><a href="https://github.com/sbomify/pypi-tea" rel="noopener">pypi-tea on GitHub</a></li>
-          <li><a href="https://pypi.org/project/libtea/" rel="noopener">libtea</a></li>
+          <li><a href="https://github.com/sbomify/pypi-tea" rel="noopener" data-ph-event="external_link_clicked" data-ph-link-type="github" data-ph-placement="footer">pypi-tea on GitHub</a></li>
+          <li><a href="https://pypi.org/project/libtea/" rel="noopener" data-ph-event="external_link_clicked" data-ph-link-type="libtea" data-ph-placement="footer">libtea</a></li>
           <li><a href="https://github.com/CycloneDX/transparency-exchange-api" rel="noopener">TEA specification</a></li>
         </ul>
       </nav>
       <nav aria-label="sbomify">
         <h2>sbomify</h2>
         <ul>
-          <li><a href="https://sbomify.com/">Product</a></li>
+          <li><a href="https://sbomify.com/" data-ph-event="sbomify_cta_clicked" data-ph-cta="product" data-ph-placement="footer">Product</a></li>
           <li><a href="https://sbomify.com/blog/">Blog</a></li>
-          <li><a href="https://app.sbomify.com">Sign in</a></li>
+          <li><a href="https://app.sbomify.com" data-ph-event="sbomify_cta_clicked" data-ph-cta="sign_in" data-ph-placement="footer">Sign in</a></li>
         </ul>
       </nav>
     </div>

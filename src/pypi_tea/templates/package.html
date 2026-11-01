@@ -108,12 +108,12 @@
         {% endif %}
         <div>
           <dt>PyPI</dt>
-          <dd><a href="https://pypi.org/project/{{ name }}/{{ version }}/" class="link" rel="noopener">{{ name }} {{ version }}</a></dd>
+          <dd><a href="https://pypi.org/project/{{ name }}/{{ version }}/" class="link" rel="noopener" data-ph-event="external_link_clicked" data-ph-link-type="pypi">{{ name }} {{ version }}</a></dd>
         </div>
         {% for label, url in project_urls.items() %}
         <div>
           <dt>{{ label }}</dt>
-          <dd><a href="{{ url }}" class="link break" rel="noopener nofollow">{{ url }}</a></dd>
+          <dd><a href="{{ url }}" class="link break" rel="noopener nofollow" data-ph-event="external_link_clicked" data-ph-link-type="project_url" data-ph-label="{{ label }}">{{ url }}</a></dd>
         </div>
         {% endfor %}
       </dl>
@@ -161,7 +161,7 @@
               </div>
             </div>
           </div>
-          <a href="{{ sbom.download_url }}" rel="nofollow" class="btn btn-navy" download>
+          <a href="{{ sbom.download_url }}" rel="nofollow" class="btn btn-navy" download data-ph-event="sbom_download_clicked" data-ph-artifact-uuid="{{ sbom.artifact_uuid }}" data-ph-wheel="{{ wheel.filename }}" data-ph-sbom-format="{{ sbom.format_family }}" data-ph-sbom-valid="{{ sbom.valid | lower }}" data-ph-wheel-attested="{{ 'true' if wheel.attestation and wheel.attestation.status == 'verified' else 'false' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             Download
           </a>
@@ -185,7 +185,7 @@ python -m libtea {{ server_root_url }} pkg:pypi/{{ name }}@{{ version }}</code><
         <h2>Manage SBOMs for your own releases</h2>
         <p>sbomify collects, shares and monitors SBOMs across every product you ship.</p>
       </div>
-      <a class="btn btn-secondary" href="https://sbomify.com/">Learn more</a>
+      <a class="btn btn-secondary" href="https://sbomify.com/" data-ph-event="sbomify_cta_clicked" data-ph-cta="learn_more" data-ph-placement="package_page">Learn more</a>
     </aside>
   </article>
 {% endblock %}

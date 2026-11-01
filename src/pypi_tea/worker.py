@@ -20,7 +20,7 @@ from importlib.metadata import version as pkg_version
 
 import httpx
 
-from pypi_tea import db, jobs, sentry, store
+from pypi_tea import analytics, db, jobs, sentry, store
 from pypi_tea.config import settings
 from pypi_tea.ingest import ingest_release, latest_version, shutdown_validation_pool
 
@@ -85,9 +85,29 @@ async def run_job(client: httpx.AsyncClient, job: jobs.Job) -> None:
         if latest and not await asyncio.to_thread(_known, job.name, latest):
             await asyncio.to_thread(_enqueue, job.name, latest, job.priority)
         return
-    await ingest_release(client, job.name, job.version, final_attempt=job.attempts >= jobs.MAX_ATTEMPTS)
+    started = time.monotonic()
+    release = await ingest_release(client, job.name, job.version, final_attempt=job.attempts >= jobs.MAX_ATTEMPTS)
     if _wake is not None:
         _wake.set()
+    if job.priority == jobs.PRIORITY_INTERACTIVE:
+        # Only releases someone asked for: backfill and refresh are bulk work, not user behaviour.
+        sboms = [s for w in release.wheels for s in w.sboms] if release else []
+        analytics.capture(
+            "release_indexed",
+            {
+                "package": job.name,
+                "version": job.version,
+                "trigger": "lookup",
+                "on_pypi": release is not None,
+                "wheel_count": len(release.wheels) if release else 0,
+                "has_sbom": bool(sboms),
+                "sbom_count": len(sboms),
+                "sbom_formats": sorted({s.family for s in sboms}),
+                "attempts": job.attempts,
+                "duration_ms": round((time.monotonic() - started) * 1000),
+            },
+            distinct_id="pypi-tea-worker",
+        )
 
 
 async def _job_loop(client: httpx.AsyncClient, stop: asyncio.Event) -> None:
@@ -198,6 +218,7 @@ async def _scheduler(stop: asyncio.Event, wake: asyncio.Event) -> None:
 
 async def run(stop: asyncio.Event, concurrency: int | None = None, schedule: bool = True) -> None:
     db.init_schema(settings.database_path)
+    await asyncio.to_thread(analytics.init)
     n = concurrency or settings.worker_concurrency
     async with make_client() as client:
         tasks = [asyncio.create_task(_job_loop(client, stop)) for _ in range(n)]
@@ -213,6 +234,7 @@ async def run(stop: asyncio.Event, concurrency: int | None = None, schedule: boo
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             shutdown_validation_pool()
+            await asyncio.to_thread(analytics.shutdown)
 
 
 def cli() -> None:

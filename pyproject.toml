@@ -28,6 +28,7 @@ dependencies = [
     "requests>=2.33.1",
     "gunicorn>=23.0",
     "uvicorn-worker>=0.3",
+    "posthog>=6.0",
 ]
 
 [project.optional-dependencies]

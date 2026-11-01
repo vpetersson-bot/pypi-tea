@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sqlite3
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -11,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pypi_tea import db, sentry
+from pypi_tea import analytics, db, sentry
 from pypi_tea.config import settings
 from pypi_tea.lookup import Overloaded, Pending, read
 from pypi_tea.routes import pages, seo, stats, tea
@@ -23,7 +24,7 @@ logger = logging.getLogger("pypi_tea.app")
 
 _STATIC_DIR = Path(__file__).parent / "static"
 # The dashboard is static apart from the version; its data loads from /stats.
-_INDEX_HTML = pages.render("index.html", nav="dashboard")
+_INDEX_HTML = pages.render("index.html", nav="dashboard", analytics_page={"page_type": "dashboard"})
 
 
 async def _flush_usage_forever() -> None:
@@ -38,6 +39,7 @@ async def _flush_usage_forever() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     db.init_schema(settings.database_path)
+    await asyncio.to_thread(analytics.init)
     background: list[asyncio.Task[None]] = [asyncio.create_task(_flush_usage_forever())]
     stop = asyncio.Event()
     if settings.embedded_worker:
@@ -55,6 +57,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 await task
         with suppress(Exception):
             await asyncio.to_thread(usage.flush)
+        await asyncio.to_thread(analytics.shutdown)
 
 
 app = FastAPI(title="pypi-tea - TEA Server for PyPI SBOMs", lifespan=lifespan)
@@ -140,6 +143,16 @@ _TEA_ENDPOINTS = frozenset(
         "artifact",
     }
 )
+# Endpoints whose calls are sent to analytics: the TEA API and the attestation lookup.
+# The dashboard's own /stats polling and crawler files would only drown them out.
+_TRACKED_ENDPOINTS = _TEA_ENDPOINTS | {".well-known", "attestation"}
+
+
+def _header(scope: Scope, name: bytes) -> str:
+    for key, value in scope.get("headers", ()):
+        if key == name:
+            return bytes(value).decode("latin-1")
+    return ""
 
 
 class EdgeMiddleware:
@@ -160,6 +173,12 @@ class EdgeMiddleware:
         if path.startswith(_version_prefix):
             path = path[len(_version_prefix) :]
         rule = next((header for prefix, header in _CACHE_RULES if path.startswith(prefix)), None)
+        endpoint = path.lstrip("/").split("/", 1)[0]
+        tracked = analytics.enabled() and endpoint in _TRACKED_ENDPOINTS
+        if tracked:
+            client = scope.get("client")
+            analytics.begin_request(client[0] if client else "", _header(scope, b"user-agent"), path)
+        started_at = time.monotonic()
         started = False
 
         async def send_wrapper(message: Message) -> None:
@@ -174,10 +193,18 @@ class EdgeMiddleware:
                     value = rule if status < 400 else ("no-store" if status >= 500 else "public, max-age=300")
                     headers.append((b"cache-control", value.encode()))
                 message["headers"] = headers
-                if status < 400:
-                    endpoint = path.lstrip("/").split("/", 1)[0]
-                    if endpoint in _TEA_ENDPOINTS:
-                        usage.endpoint(endpoint)
+                if status < 400 and endpoint in _TEA_ENDPOINTS:
+                    usage.endpoint(endpoint)
+                if tracked:
+                    analytics.capture(
+                        "tea_api_called",
+                        {
+                            "endpoint": endpoint,
+                            "status_code": status,
+                            "versioned_url": scope["path"] != path,
+                            "duration_ms": round((time.monotonic() - started_at) * 1000, 1),
+                        },
+                    )
             await send(message)
 
         try:
@@ -186,6 +213,8 @@ class EdgeMiddleware:
         except TimeoutError:
             if started:
                 raise
+            if tracked:
+                analytics.capture("tea_api_called", {"endpoint": endpoint, "status_code": 503, "timed_out": True})
             response = JSONResponse(
                 status_code=503,
                 content={"error": "Request timed out"},

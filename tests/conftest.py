@@ -16,6 +16,9 @@ from pypi_tea import db
 from pypi_tea.config import settings
 from pypi_tea.lookup import _memo
 
+# Never send test traffic to PostHog; tests that exercise analytics install a fake client.
+settings.posthog_api_key = ""
+
 CDX = {"bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1, "components": []}
 
 
