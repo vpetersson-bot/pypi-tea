@@ -3,7 +3,6 @@ import logging
 import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
-from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
