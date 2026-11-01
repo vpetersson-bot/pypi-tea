@@ -108,6 +108,15 @@ All settings are configurable via environment variables with the `PYPI_TEA_` pre
 | `PYPI_TEA_WHEEL_CONCURRENCY` | `4` | Wheels inspected at once within one release |
 | `PYPI_TEA_EMBEDDED_WORKER` | `false` | Run the worker inside the API process (development/tests only) |
 
+Error tracking uses Sentry's own variables and applies to the API, the worker and `pypi-tea-refresh` alike (events carry a `component` tag):
+
+| Variable | Default | Description |
+|---|---|---|
+| `SENTRY_DSN` | unset | Sentry DSN; unset disables error tracking |
+| `SENTRY_ENVIRONMENT` | `production` | Sentry environment name |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0.01` | Share of requests and jobs sent as performance traces |
+| `SENTRY_SEND_DEFAULT_PII` | `false` | Attach request headers and client IPs to events |
+
 ### Queue maintenance
 
 ```bash

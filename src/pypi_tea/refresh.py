@@ -16,7 +16,7 @@ import sys
 
 from packaging.utils import canonicalize_name
 
-from pypi_tea import db, jobs
+from pypi_tea import db, jobs, sentry
 from pypi_tea.config import settings
 from pypi_tea.worker import enqueue_refresh
 
@@ -72,6 +72,7 @@ def main() -> None:
 
 def cli() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    sentry.init("refresh")
     try:
         main()
     except KeyboardInterrupt:

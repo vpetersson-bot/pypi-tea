@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
@@ -8,23 +7,17 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
-import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pypi_tea import db
+from pypi_tea import db, sentry
 from pypi_tea.config import settings
 from pypi_tea.lookup import Overloaded, Pending, read
 from pypi_tea.routes import pages, seo, stats, tea
 from pypi_tea.usage import FLUSH_SECONDS, usage
 
-sentry_sdk.init(
-    dsn=os.environ.get("SENTRY_DSN", ""),
-    send_default_pii=False,
-    traces_sample_rate=0.01,
-    release=version("pypi-tea"),
-)
+sentry.init("api")
 
 logger = logging.getLogger("pypi_tea.app")
 
